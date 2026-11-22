@@ -33,14 +33,14 @@ Public Sub SetupBudgetOptimizerSheet1()
     If Len(CStr(p.Range("A1").Value2)) = 0 Then
         p.Range("A1").Value2 = "BUDGET OPTIMIZER  |  Sheet1 M1/M2 trial"
         p.Range("A3").Value2 = "H40"
-        p.Range("D3").Value2 = "Focus year"
+        p.Range("D3").Value2 = "Fiscal year (Apr-Mar)"
         p.Range("E3").Value2 = 2027
-        p.Range("A5:F5").Value = Array("Metric", "26F full-year (manual + delta)", "26F in-window", "Focus year in-window", "Target (optional)", "Target difference")
+        p.Range("A5:F5").Value = Array("Metric", "26F full-FY (manual + delta)", "26F in-window Apr-Mar", "Focus FY in-window", "Target (optional)", "Target difference")
         p.Range("A6:A9").Value = Application.Transpose(Array("Demand Amt", "Demand Qty", "Sales Amt", "Sales Qty"))
         p.Range("A11").Value2 = "26F full Sales Amt"
-        p.Range("A12").Value2 = "Focus year Sales Amt"
+        p.Range("A12").Value2 = "Focus FY Sales Amt"
         p.Range("A13").Value2 = "YoY"
-        p.Range("D11").Value2 = "All H40 focus-year Sales Amt"
+        p.Range("D11").Value2 = "All H40 focus-FY Sales Amt"
         p.Range("D12").Value2 = "Run status"
         p.Range("A15").Value2 = "Edit 26F annual baselines in Base26 B:E. Only current in-window differences are added."
         p.Range("A16").Value2 = "Trial changes come from Edit_Plan; the source Sheet1/Budget_Data is never edited."
@@ -176,13 +176,13 @@ Public Sub RefreshBudgetSheet1Preview()
             found = True
             For m = 0 To MONTH_COUNT - 1
                 ReadMetrics trial, r, m, vals
-                If keys(m) \ 100 = 2026 Then AddMetrics cur26, vals
-                If keys(m) \ 100 = focusYear Then AddMetrics curYear, vals
+                If FiscalYear(keys(m)) = 2026 Then AddMetrics cur26, vals
+                If FiscalYear(keys(m)) = focusYear Then AddMetrics curYear, vals
             Next m
         End If
         If IsBudgetDataRow(trial, r) Then
         For m = 0 To MONTH_COUNT - 1
-            If keys(m) \ 100 = focusYear Then
+            If FiscalYear(keys(m)) = focusYear Then
                 ReadMetrics trial, r, m, vals
                 AddMetrics allYear, vals
             End If
@@ -193,7 +193,7 @@ Public Sub RefreshBudgetSheet1Preview()
     For r = firstDataRow To lastRow
         If IsBudgetDataRow(src, r) And StrComp(Trim$(CStr(src.Cells(r, H40_COL).Value2)), h40, vbTextCompare) = 0 Then
             For m = 0 To MONTH_COUNT - 1
-                If keys(m) \ 100 = 2026 Then
+                If FiscalYear(keys(m)) = 2026 Then
                     ReadMetrics src, r, m, vals
                     AddMetrics old26, vals
                 End If
@@ -384,6 +384,20 @@ Private Sub FindRollingMonths(ByVal ws As Worksheet, ByRef months() As Long, ByR
         End If
     Next m
 End Sub
+
+' Fiscal year F begins in April of YYYY and ends in March of YYYY+1.
+' E.g. 2027/03 = 26F, 2027/04 = 27F, 2028/03 = 27F.
+Private Function FiscalYear(ByVal key As Long) As Long
+    Dim y As Long, mm As Long
+    y = key \ 100
+    mm = key Mod 100
+    If mm < 1 Or mm > 12 Then Err.Raise vbObjectError + 144, , "Invalid YYYYMM: " & key
+    If mm >= 4 Then
+        FiscalYear = y
+    Else
+        FiscalYear = y - 1
+    End If
+End Function
 
 Private Function NextMonth(ByVal key As Long) As Long
     If key Mod 100 = 12 Then
