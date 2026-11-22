@@ -17,7 +17,8 @@ Private Const SALES_AMT_COL As Long = 127       ' Sales Amt: DW
 Private Const H40_COL As Long = 19             ' S
 Private Const MONTH_COUNT As Long = 20
 Private Const OVERVIEW_SHEET As String = "Budget_Overview"
-Private Const MODEL_START_ROW As Long = 37
+Private Const MODEL_START_ROW As Long = 40
+Private Const MODEL_HEADER_ROW As Long = 39
 Private Const HELP_FIRST As Long = 147
 Private mV3Stage As String
 
@@ -544,9 +545,29 @@ Private Sub MigrateOldPanel()
     End If
 End Sub
 
+' Preserve existing monthly input values when upgrading V3 layout 36/37 -> 39/40.
+' This is done only once. Do not clear/rebuild target values.
+Private Sub UpgradeOverviewLayout(ByVal ov As Worksheet)
+    Dim oldLast As Long, rr As Long, valueKey As String
+    If CStr(ov.Range("S2").Value2) = "V3_LAYOUT_39" Then Exit Sub
+    If CStr(ov.Range("A36").Value2) = "Model (source B)" Then
+        oldLast = ov.Cells(ov.Rows.Count, "A").End(xlUp).Row
+        ov.Rows("37:39").Insert Shift:=xlDown
+        ' Old data now begins at row 40; keep its B and E:P values unchanged.
+        If oldLast >= 37 Then
+            For rr = MODEL_START_ROW To oldLast + 3
+                valueKey = Trim$(CStr(ov.Cells(rr, 1).Value2))
+                If Len(valueKey) > 0 Then ov.Cells(rr, 19).Value2 = valueKey
+            Next rr
+        End If
+        ov.Range("A36:R38").ClearContents
+    End If
+    ov.Range("S2").Value2 = "V3_LAYOUT_39"
+End Sub
+
 Private Sub EnsureOverview(ByVal src As Worksheet)
     Dim ov As Worksheet, r As Long, last As Long, machine As String, seen As Object
-    Dim nextR As Long, currentCode As String, keys(0 To MONTH_COUNT - 1) As Long
+    Dim nextR As Long, currentCode As String, currentLabel As String, keys(0 To MONTH_COUNT - 1) As Long
     Dim header As Long, m As Long, fy As Long, first As Long, original As Double
     mV3Stage = "O01 ensure Overview worksheet"
     Set ov = EnsureSheet(OVERVIEW_SHEET)
@@ -590,13 +611,16 @@ Private Sub EnsureOverview(ByVal src As Worksheet)
         ov.Columns("R").Hidden = True
     End If
     mV3Stage = "O03 build model table header"
-    ov.Range("A36:D36").Value = Array("Model (source B)", "27F target (manual)", "Original 27F qty", "Planned 27F qty")
+    UpgradeOverviewLayout ov
+    ov.Range("A39:D39").Value = Array("Model (source M)", "27F target (manual)", "Original 27F qty", "Planned 27F qty")
     For m = 0 To 11
-        ov.Cells(36, 5 + m).Value2 = Format(DateSerial(CLng(ov.Range("B3").Value2), 4 + m, 1), "yyyy_mm")
+        ov.Cells(MODEL_HEADER_ROW, 5 + m).Value2 = Format(DateSerial(CLng(ov.Range("B3").Value2), 4 + m, 1), "yyyy_mm")
     Next m
-    ov.Range("Q36").Value2 = "Plan vs model target"
-    ov.Range("R36").Value2 = "Source row"
-    ov.Range("A36:Q36").Font.Bold = True
+    ov.Range("Q39").Value2 = "Plan vs model target"
+    ov.Range("R39").Value2 = "Source row"
+    ov.Range("S39").Value2 = "Machine key (source B)"
+    ov.Columns("S").Hidden = True
+    ov.Range("A39:Q39").Font.Bold = True
     mV3Stage = "O04 initialize model dictionary"
     Set seen = CreateObject("Scripting.Dictionary")
     seen.CompareMode = vbTextCompare
@@ -613,12 +637,15 @@ Private Sub EnsureOverview(ByVal src As Worksheet)
         If IsBudgetDataRow(src, r) And Len(currentCode) > 0 Then
             If Not seen.Exists(currentCode) Then
                 seen.Add currentCode, nextR
-                If Len(Trim$(CStr(ov.Cells(nextR, 1).Value2))) = 0 Then
-                    ov.Cells(nextR, 1).Value2 = currentCode
+                If Len(Trim$(CStr(ov.Cells(nextR, 19).Value2))) = 0 Then
+                    ov.Cells(nextR, 19).Value2 = currentCode
                     ov.Cells(nextR, 18).Value2 = r
-                ElseIf StrComp(Trim$(CStr(ov.Cells(nextR, 1).Value2)), currentCode, vbTextCompare) <> 0 Then
-                    Err.Raise vbObjectError + 170, , "Model order changed. Preserve the existing plan, inspect Overview row " & nextR & ", then clear A37:R before rebuilding."
+                ElseIf StrComp(Trim$(CStr(ov.Cells(nextR, 19).Value2)), currentCode, vbTextCompare) <> 0 Then
+                    Err.Raise vbObjectError + 170, , "Model order changed. Preserve existing plan; machine key mismatch at Overview row " & nextR & "."
                 End If
+                currentLabel = Trim$(CStr(src.Cells(r, 13).Value2))
+                If Len(currentLabel) = 0 Then currentLabel = currentCode
+                ov.Cells(nextR, 1).Value2 = currentLabel
                 original = 0
                 For m = 0 To MONTH_COUNT - 1
                     If FiscalYear(keys(m)) = fy Then original = original + SafeNumber(src.Cells(r, FIRST_MONTH_COL + m).Value2)
@@ -716,7 +743,7 @@ Public Sub GenerateSeasonalSetQtyPlanV3()
     If detail Is Nothing Then Err.Raise vbObjectError + 193, , "Budget_Detail missing after initialization"
     detail.Range("E3").Value2 = fy
     mV3Stage = "G06 locate model rows"
-    lastR = ov.Cells(ov.Rows.Count, "A").End(xlUp).Row
+    lastR = ov.Cells(ov.Rows.Count, "S").End(xlUp).Row
     If lastR < MODEL_START_ROW Then Err.Raise vbObjectError + 181, , "No models in Overview"
     If Not IsNumeric(ov.Range("B6").Value2) Then Err.Raise vbObjectError + 182, , "Enter 27F TTL target in B6"
     yearTarget = CDbl(ov.Range("B6").Value2)
@@ -799,8 +826,8 @@ Private Sub ApplyOverviewSetQty(ByVal trial As Worksheet, ByVal src As Worksheet
     fy = CLng(ov.Range("B3").Value2)
     Set dict = CreateObject("Scripting.Dictionary")
     dict.CompareMode = vbTextCompare
-    For rr = MODEL_START_ROW To ov.Cells(ov.Rows.Count, 1).End(xlUp).Row
-        If Len(Trim$(CStr(ov.Cells(rr, 1).Value2))) > 0 Then dict(Trim$(CStr(ov.Cells(rr, 1).Value2))) = rr
+    For rr = MODEL_START_ROW To ov.Cells(ov.Rows.Count, 19).End(xlUp).Row
+        If Len(Trim$(CStr(ov.Cells(rr, 19).Value2))) > 0 Then dict(Trim$(CStr(ov.Cells(rr, 19).Value2))) = rr
     Next rr
     carry = vbNullString
     For r = firstR To lastR
