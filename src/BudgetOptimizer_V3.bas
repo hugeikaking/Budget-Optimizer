@@ -567,7 +567,7 @@ End Sub
 
 Private Sub EnsureOverview(ByVal src As Worksheet)
     Dim ov As Worksheet, r As Long, last As Long, machine As String, seen As Object
-    Dim nextR As Long, currentCode As String, currentLabel As String, keys(0 To MONTH_COUNT - 1) As Long
+    Dim nextR As Long, currentCode As String, currentLabel As String, labelByCode As Object, keys(0 To MONTH_COUNT - 1) As Long
     Dim header As Long, m As Long, fy As Long, first As Long, original As Double
     mV3Stage = "O01 ensure Overview worksheet"
     Set ov = EnsureSheet(OVERVIEW_SHEET)
@@ -624,6 +624,8 @@ Private Sub EnsureOverview(ByVal src As Worksheet)
     mV3Stage = "O04 initialize model dictionary"
     Set seen = CreateObject("Scripting.Dictionary")
     seen.CompareMode = vbTextCompare
+    Set labelByCode = CreateObject("Scripting.Dictionary")
+    labelByCode.CompareMode = vbTextCompare
     last = src.Cells(src.Rows.Count, H40_COL).End(xlUp).Row
     mV3Stage = "O05 detect rolling month headers"
     FindRollingMonths src, keys, header
@@ -634,6 +636,8 @@ Private Sub EnsureOverview(ByVal src As Worksheet)
     For r = header + 1 To last
         If Len(Trim$(CStr(src.Cells(r, 2).Value2))) > 0 Then _
             currentCode = Trim$(CStr(src.Cells(r, 2).Value2))
+        If Len(currentCode) > 0 And Len(Trim$(CStr(src.Cells(r, 13).Value2))) > 0 Then _
+            labelByCode(currentCode) = Trim$(CStr(src.Cells(r, 13).Value2))
         If IsBudgetDataRow(src, r) And Len(currentCode) > 0 Then
             If Not seen.Exists(currentCode) Then
                 seen.Add currentCode, nextR
@@ -643,8 +647,8 @@ Private Sub EnsureOverview(ByVal src As Worksheet)
                 ElseIf StrComp(Trim$(CStr(ov.Cells(nextR, 19).Value2)), currentCode, vbTextCompare) <> 0 Then
                     Err.Raise vbObjectError + 170, , "Model order changed. Preserve existing plan; machine key mismatch at Overview row " & nextR & "."
                 End If
-                currentLabel = Trim$(CStr(src.Cells(r, 13).Value2))
-                If Len(currentLabel) = 0 Then currentLabel = currentCode
+                currentLabel = currentCode
+                If labelByCode.Exists(currentCode) Then currentLabel = labelByCode(currentCode)
                 ov.Cells(nextR, 1).Value2 = currentLabel
                 original = 0
                 For m = 0 To MONTH_COUNT - 1
@@ -680,7 +684,7 @@ Private Sub PrepareMonthlyTotalData(ByVal ov As Worksheet, ByVal lastModel As Lo
     ov.Range("T1").Value2 = "Month"
     ov.Range("U1").Value2 = "27F TTL Set QTY"
     For m = 0 To 11
-        txt = CStr(ov.Cells(36, m + 5).Value2)
+        txt = CStr(ov.Cells(MODEL_HEADER_ROW, m + 5).Value2)
         ov.Cells(m + 2, 20).Value2 = txt
         ov.Cells(m + 2, 21).Formula = "=SUM(" & ov.Cells(MODEL_START_ROW, m + 5).Address(False, False) & ":" & ov.Cells(lastModel, m + 5).Address(False, False) & ")"
     Next m
