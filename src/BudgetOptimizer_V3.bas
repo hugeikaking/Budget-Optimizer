@@ -20,6 +20,9 @@ Private Const OVERVIEW_SHEET As String = "Budget_Overview"
 Private Const MODEL_START_ROW As Long = 40
 Private Const MODEL_HEADER_ROW As Long = 39
 Private Const HELP_FIRST As Long = 147
+Private Const FMT_WHOLE As String = "#,##0;[Red]-#,##0;0"
+Private Const FMT_PRICE As String = "#,##0.#####;[Red]-#,##0.#####;0"
+Private Const FMT_PERCENT As String = "0.00%;[Red]-0.00%;0.00%"
 Private mV3Stage As String
 
 ' One-time initialization. Does not overwrite populated existing panels.
@@ -73,6 +76,7 @@ Public Sub SetupBudgetOptimizerSheet1()
     End If
     RefreshH40List src, p, b
     EnsureOverview src
+    FormatBudgetV3Display
     p.Activate
     MsgBox "Setup complete. Choose H40 in Budget_Panel!B3, enter 26F annual baseline in Base26, then run RefreshBudgetSheet1Preview.", vbInformation
     Exit Sub
@@ -166,6 +170,7 @@ Public Sub RefreshBudgetSheet1Preview()
     If lastRow < firstDataRow Then Err.Raise vbObjectError + 105, , "No data rows below month header"
     RefreshH40List src, panel, b
     EnsureOverview src
+    FormatBudgetV3Display
     Application.ScreenUpdating = False
     Application.EnableEvents = False
     origAlerts = Application.DisplayAlerts
@@ -565,6 +570,39 @@ Private Sub UpgradeOverviewLayout(ByVal ov As Worksheet)
     ov.Range("S2").Value2 = "V3_LAYOUT_39"
 End Sub
 
+' Presentation only: do not round underlying budget values or source cells.
+' Reapply on existing sheets because Setup does not rebuild populated panels.
+Private Sub FormatBudgetV3Display()
+    Dim ov As Worksheet, detail As Worksheet, base As Worksheet, plan As Worksheet
+    Set ov = FindSheet(OVERVIEW_SHEET)
+    Set detail = FindSheet(PANEL_SHEET)
+    Set base = FindSheet(BASE_SHEET)
+    Set plan = FindSheet(PLAN_SHEET)
+
+    If Not ov Is Nothing Then
+        ov.Range("B5:B7").NumberFormat = FMT_WHOLE
+        ov.Range("B8:B9").NumberFormat = FMT_PERCENT
+        ov.Range("E5:E6").NumberFormat = FMT_WHOLE
+        ov.Range("E7").NumberFormat = FMT_PERCENT
+        ov.Range("E8").NumberFormat = FMT_WHOLE
+        ov.Range("B" & MODEL_START_ROW & ":D" & ov.Rows.Count).NumberFormat = FMT_WHOLE
+        ov.Range("E" & MODEL_START_ROW & ":Q" & ov.Rows.Count).NumberFormat = FMT_WHOLE
+        ov.Range("U2:U13").NumberFormat = FMT_WHOLE
+    End If
+    If Not detail Is Nothing Then
+        detail.Range("B6:F9").NumberFormat = FMT_WHOLE
+        detail.Range("B11:B12").NumberFormat = FMT_WHOLE
+        detail.Range("B13").NumberFormat = FMT_PERCENT
+        detail.Range("E11").NumberFormat = FMT_WHOLE
+    End If
+    If Not base Is Nothing Then base.Range("B2:E" & base.Rows.Count).NumberFormat = FMT_WHOLE
+    If Not plan Is Nothing Then
+        plan.Range("E2:E" & plan.Rows.Count).NumberFormat = FMT_WHOLE  ' Pcs/Set
+        plan.Range("F2:F" & plan.Rows.Count).NumberFormat = FMT_PRICE  ' S/P up to 5 decimals
+        plan.Range("G2:H" & plan.Rows.Count).NumberFormat = FMT_WHOLE  ' Share and Comp Ratio
+    End If
+End Sub
+
 Private Sub EnsureOverview(ByVal src As Worksheet)
     Dim ov As Worksheet, r As Long, last As Long, machine As String, seen As Object
     Dim nextR As Long, currentCode As String, currentLabel As String, labelByCode As Object, keys(0 To MONTH_COUNT - 1) As Long
@@ -686,6 +724,7 @@ Private Sub EnsureOverview(ByVal src As Worksheet)
     PrepareMonthlyTotalData ov, nextR - 1
     mV3Stage = "O09 create trend chart"
     CreateSetQtyTrendChart ov
+    FormatBudgetV3Display
 End Sub
 
 Private Sub PrepareMonthlyTotalData(ByVal ov As Worksheet, ByVal lastModel As Long)
