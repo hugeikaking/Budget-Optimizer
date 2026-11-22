@@ -28,6 +28,8 @@ Private Const FMT_WHOLE As String = "#,##0;[Red]-#,##0;0"
 Private Const FMT_PRICE As String = "#,##0.#####;[Red]-#,##0.#####;0"
 Private Const FMT_PERCENT As String = "0.00%;[Red]-0.00%;0.00%"
 Private mV3Stage As String
+Public gBudgetV4Events As C_BudgetV4Events
+Private gV4Busy As Boolean
 
 ' One-time initialization. Does not overwrite populated existing panels.
 Public Sub SetupBudgetOptimizerSheet1()
@@ -1064,9 +1066,6 @@ End Sub
 ' The class C_BudgetV4Events routes Application.SheetChange to
 ' BudgetV4_OnDetailChange. Auto_Open initializes the event listener.
 ' Source Budget_Data / Sheet1 is never changed.
-
-Public gBudgetV4Events As C_BudgetV4Events
-Private gV4Busy As Boolean
 
 Public Sub Auto_Open()
     On Error Resume Next
