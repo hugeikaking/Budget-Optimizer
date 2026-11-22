@@ -189,7 +189,8 @@ Public Sub RefreshBudgetSheet1Preview()
             numEdits = numEdits + 1
         End If
     Next r
-    ApplyOverviewSetQty trial, src, firstDataRow, lastRow, keys
+    Dim appliedSetCells As Long
+    appliedSetCells = ApplyOverviewSetQty(trial, src, firstDataRow, lastRow, keys)
     BuildTrialSummaryFormulas trial, panel, firstDataRow, lastRow, keys, focusYear
     trial.Calculate
     src.Calculate
@@ -243,7 +244,8 @@ Public Sub RefreshBudgetSheet1Preview()
     panel.Range("E11").Formula = "=SUM('" & TRIAL_SHEET & "'!" & trial.Range(trial.Cells(firstDataRow, HELP_FIRST + 3), trial.Cells(lastRow, HELP_FIRST + 3)).Address(False, False) & ")"
     LinkLiveDetail panel, trial, firstDataRow, lastRow
     LinkOverviewSummary trial, firstDataRow, lastRow
-    panel.Range("E12").Value2 = "Trial refreshed; " & numEdits & " enabled plan row(s); header " & headerRow
+    panel.Range("E12").Value2 = "Trial refreshed; " & numEdits & " edit row(s); Set QTY cells linked: " & appliedSetCells
+    If Not FindSheet(OVERVIEW_SHEET) Is Nothing Then FindSheet(OVERVIEW_SHEET).Range("B11").Value2 = "Set QTY cells linked: " & appliedSetCells
     Application.Calculate
     panel.Activate
     MsgBox "Preview complete. Budget_Overview and Budget_Detail share the same trial; source unchanged.", vbInformation
@@ -891,19 +893,59 @@ Private Function RoundTwoSignificant(ByVal x As Double) As Double
     If RoundTwoSignificant <> Fix(RoundTwoSignificant) Then RoundTwoSignificant = WorksheetFunction.Round(RoundTwoSignificant, 0)
 End Function
 
-Private Sub ApplyOverviewSetQty(ByVal trial As Worksheet, ByVal src As Worksheet, _
-    ByVal firstR As Long, ByVal lastR As Long, ByRef keys() As Long)
+' Re-apply model-level Set QTY after EVERY source-to-trial rebuild.
+' Return how many FY cells were linked; fail visibly if a previously active plan
+' is incomplete instead of silently returning original Set QTY.
+Private Function ApplyOverviewSetQty(ByVal trial As Worksheet, ByVal src As Worksheet, _
+    ByVal firstR As Long, ByVal lastR As Long, ByRef keys() As Long) As Long
     Dim ov As Worksheet, dict As Object, r As Long, rr As Long, m As Long
-    Dim model As String, carry As String, fy As Long, monthNo As Long, val As Variant
+    Dim carry As String, fy As Long, monthNo As Long, v As Variant
+    Dim planStatus As String, plannedRows As Long, filled As Long, validModels As Long
+    Dim lastModel As Long, expected As Long, firstCheckRow As Long, firstCheckMonth As Long
+    Dim qtyFormula As String
+
     Set ov = FindSheet(OVERVIEW_SHEET)
-    If ov Is Nothing Then Exit Sub
-    If UCase$(Trim$(CStr(ov.Range("B10").Value2))) <> "ACTIVE" Then Exit Sub
+    If ov Is Nothing Then Exit Function
+    lastModel = ov.Cells(ov.Rows.Count, 19).End(xlUp).Row
+    If lastModel < MODEL_START_ROW Then Exit Function
+    planStatus = UCase$(Trim$(CStr(ov.Range("B10").Value2)))
+
+    ' Determine availability from actual monthly plan values, not only a label.
+    For rr = MODEL_START_ROW To lastModel
+        If Len(Trim$(CStr(ov.Cells(rr, 19).Value2))) > 0 Then
+            validModels = validModels + 1
+            For monthNo = 0 To 11
+                v = ov.Cells(rr, 5 + monthNo).Value2
+                If IsError(v) Then Err.Raise vbObjectError + 196, , _
+                    "Set QTY plan contains an Excel error at " & ov.Cells(rr, 5 + monthNo).Address(False, False)
+                If Len(Trim$(CStr(v))) > 0 Then filled = filled + 1
+            Next monthNo
+        End If
+    Next rr
+
+    If filled = 0 Then
+        If planStatus = "ACTIVE" Then Err.Raise vbObjectError + 197, , _
+            "Seasonal plan is marked ACTIVE but all monthly Set QTY cells are blank. Generate the plan again."
+        ov.Range("B11").Value2 = "No 27F Set QTY plan generated"
+        Exit Function
+    End If
+    If filled <> validModels * 12 Then
+        Err.Raise vbObjectError + 198, , "Monthly Set QTY plan incomplete: " & _
+            filled & " of " & validModels * 12 & " cells filled. Review Budget_Overview E:P before refreshing."
+    End If
+
     fy = CLng(ov.Range("B3").Value2)
     Set dict = CreateObject("Scripting.Dictionary")
     dict.CompareMode = vbTextCompare
-    For rr = MODEL_START_ROW To ov.Cells(ov.Rows.Count, 19).End(xlUp).Row
-        If Len(Trim$(CStr(ov.Cells(rr, 19).Value2))) > 0 Then dict(Trim$(CStr(ov.Cells(rr, 19).Value2))) = rr
+    For rr = MODEL_START_ROW To lastModel
+        carry = Trim$(CStr(ov.Cells(rr, 19).Value2))
+        If Len(carry) > 0 Then
+            If dict.Exists(carry) Then Err.Raise vbObjectError + 199, , _
+                "Duplicate machine key in Budget_Overview S column: " & carry
+            dict.Add carry, rr
+        End If
     Next rr
+
     carry = vbNullString
     For r = firstR To lastR
         If Len(Trim$(CStr(src.Cells(r, 2).Value2))) > 0 Then carry = Trim$(CStr(src.Cells(r, 2).Value2))
@@ -914,18 +956,31 @@ Private Sub ApplyOverviewSetQty(ByVal trial As Worksheet, ByVal src As Worksheet
             For m = 0 To MONTH_COUNT - 1
                 If FiscalYear(keys(m)) = fy Then
                     monthNo = (keys(m) Mod 100 + 8) Mod 12
-                    val = ov.Cells(rr, 5 + monthNo).Value2
-                    If IsError(val) Then Err.Raise vbObjectError + 188, , "Invalid monthly qty: model " & carry
-                    If Len(Trim$(CStr(val))) = 0 Or Not IsNumeric(val) Then _
-                        Err.Raise vbObjectError + 189, , "Missing numeric monthly qty at model " & carry
-                    If CDbl(val) < 0 Or CDbl(val) <> Fix(CDbl(val)) Then _
+                    v = ov.Cells(rr, 5 + monthNo).Value2
+                    If Not IsNumeric(v) Then Err.Raise vbObjectError + 189, , _
+                        "Missing numeric monthly Set QTY for model " & carry & ", month " & keys(m)
+                    If CDbl(v) < 0 Or CDbl(v) <> Fix(CDbl(v)) Then _
                         Err.Raise vbObjectError + 190, , "Set QTY must be a nonnegative integer: " & carry
-                    trial.Cells(r, FIRST_MONTH_COL + m).Formula = "='" & OVERVIEW_SHEET & "'!" & ov.Cells(rr, 5 + monthNo).Address(True, True)
+                    qtyFormula = "='" & OVERVIEW_SHEET & "'!" & ov.Cells(rr, 5 + monthNo).Address(True, True)
+                    trial.Cells(r, FIRST_MONTH_COL + m).Formula = qtyFormula
+                    ApplyOverviewSetQty = ApplyOverviewSetQty + 1
+                    If firstCheckRow = 0 Then
+                        firstCheckRow = r
+                        firstCheckMonth = m
+                    End If
                 End If
             Next m
         End If
     Next r
-End Sub
+    expected = ApplyOverviewSetQty
+    If expected = 0 Then Err.Raise vbObjectError + 200, , _
+        "Plan data exists but no Set QTY cells were linked; verify selected FY and rolling month headers."
+    If Not trial.Cells(firstCheckRow, FIRST_MONTH_COL + firstCheckMonth).HasFormula Then _
+        Err.Raise vbObjectError + 201, , "Set QTY link was not written to trial row " & firstCheckRow
+
+    ov.Range("B10").Value2 = "ACTIVE"
+    ov.Range("B11").Value2 = "Set QTY cells linked: " & expected
+End Function
 
 Private Sub BuildTrialSummaryFormulas(ByVal trial As Worksheet, ByVal panel As Worksheet, _
     ByVal firstR As Long, ByVal lastR As Long, ByRef keys() As Long, ByVal fy As Long)
