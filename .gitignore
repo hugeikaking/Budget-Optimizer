@@ -1,0 +1,20 @@
+# Never commit real company budget data or outputs
+*.xlsm
+*.xlsb
+*.xls
+*.xlsx
+*.csv
+*.tsv
+*.zip
+*.log
+*.bak
+*.tmp
+~$*
+output/
+outputs/
+data/
+private/
+backups/
+历史数据/
+原始预算表/
+输出结果/
