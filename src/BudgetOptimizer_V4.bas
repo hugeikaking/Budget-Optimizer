@@ -28,7 +28,6 @@ Private Const FMT_WHOLE As String = "#,##0;[Red]-#,##0;0"
 Private Const FMT_PRICE As String = "#,##0.#####;[Red]-#,##0.#####;0"
 Private Const FMT_PERCENT As String = "0.00%;[Red]-0.00%;0.00%"
 Private mV3Stage As String
-Public gBudgetV4Events As C_BudgetV4Events
 Private gV4Busy As Boolean
 
 ' One-time initialization. Does not overwrite populated existing panels.
@@ -1064,22 +1063,10 @@ End Sub
 
 
 ' ===== V4 interaction layer =====
-' The class C_BudgetV4Events routes Application.SheetChange to
-' BudgetV4_OnDetailChange. Auto_Open initializes the event listener.
+' Worksheet change events are handled in ThisWorkbook (Workbook_SheetChange).
+' No .cls import or WithEvents helper class is required.
+' See docs/V4_自动H40操作与验收.md for the short ThisWorkbook event.
 ' Source Budget_Data / Sheet1 is never changed.
-
-Public Sub Auto_Open()
-    On Error Resume Next
-    StartBudgetV4Events
-    On Error GoTo 0
-End Sub
-
-Public Sub StartBudgetV4Events()
-    If gBudgetV4Events Is Nothing Then
-        Set gBudgetV4Events = New C_BudgetV4Events
-    End If
-    Set gBudgetV4Events.ExcelApp = Application
-End Sub
 
 Public Sub SetupBudgetOptimizerV4()
     Dim prevEvents As Boolean
@@ -1096,7 +1083,6 @@ Public Sub SetupBudgetOptimizerV4()
     ' Ensure trial is available, but never replace an existing user's plan on setup.
     If FindSheet(TRIAL_SHEET) Is Nothing Then RefreshBudgetSheet1Preview True
     LoadDetailEditorV4
-    StartBudgetV4Events
     Application.EnableEvents = prevEvents
     panel.Activate
     MsgBox "V4 enabled. Choose H40 in Budget_Detail!B3; edit proposed F:I in the row editor. Changes refresh automatically.", vbInformation
