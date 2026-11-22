@@ -1283,7 +1283,7 @@ End Sub
 Private Sub SyncDetailRowToPlanV4(ByVal p As Worksheet, ByVal detailRow As Long)
     Dim pl As Worksheet, planRow As Long, sourceRow As Long, i As Long
     Dim monthFrom As String, monthTo As String, raw As Variant, h40 As String
-    Dim hasChanges As Boolean, qty As Double, scale As Double
+    Dim hasChanges As Boolean, qty As Double
     Set pl = FindSheet(PLAN_SHEET)
     sourceRow = CLng(Val(p.Cells(detailRow, 1).Value2))
     If sourceRow < 1 Then Exit Sub
