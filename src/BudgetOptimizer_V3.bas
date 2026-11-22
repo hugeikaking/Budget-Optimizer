@@ -19,6 +19,7 @@ Private Const MONTH_COUNT As Long = 20
 Private Const OVERVIEW_SHEET As String = "Budget_Overview"
 Private Const MODEL_START_ROW As Long = 37
 Private Const HELP_FIRST As Long = 147
+Private mV3Stage As String
 
 ' One-time initialization. Does not overwrite populated existing panels.
 Public Sub SetupBudgetOptimizerSheet1()
@@ -547,7 +548,9 @@ Private Sub EnsureOverview(ByVal src As Worksheet)
     Dim ov As Worksheet, r As Long, last As Long, machine As String, seen As Object
     Dim nextR As Long, currentCode As String, keys(0 To MONTH_COUNT - 1) As Long
     Dim header As Long, m As Long, fy As Long, first As Long, original As Double
+    mV3Stage = "O01 ensure Overview worksheet"
     Set ov = EnsureSheet(OVERVIEW_SHEET)
+    mV3Stage = "O02 initialize Overview headings"
     If Len(CStr(ov.Range("A1").Value2)) = 0 Then
         ov.Range("A1").Value2 = "BUDGET OVERVIEW  |  MODEL SET QTY + TTL SALES AMT"
         ov.Range("A3").Value2 = "FY (Apr-Mar)"
@@ -586,6 +589,7 @@ Private Sub EnsureOverview(ByVal src As Worksheet)
         ov.Columns("Q").ColumnWidth = 18
         ov.Columns("R").Hidden = True
     End If
+    mV3Stage = "O03 build model table header"
     ov.Range("A36:D36").Value = Array("Model (source B)", "27F target (manual)", "Original 27F qty", "Planned 27F qty")
     For m = 0 To 11
         ov.Cells(36, 5 + m).Value2 = Format(DateSerial(CLng(ov.Range("B3").Value2), 4 + m, 1), "yyyy_mm")
@@ -593,13 +597,16 @@ Private Sub EnsureOverview(ByVal src As Worksheet)
     ov.Range("Q36").Value2 = "Plan vs model target"
     ov.Range("R36").Value2 = "Source row"
     ov.Range("A36:Q36").Font.Bold = True
+    mV3Stage = "O04 initialize model dictionary"
     Set seen = CreateObject("Scripting.Dictionary")
     seen.CompareMode = vbTextCompare
     last = src.Cells(src.Rows.Count, H40_COL).End(xlUp).Row
+    mV3Stage = "O05 detect rolling month headers"
     FindRollingMonths src, keys, header
     fy = CLng(ov.Range("B3").Value2)
     nextR = MODEL_START_ROW
     currentCode = vbNullString
+    mV3Stage = "O06 scan B column machine IDs"
     For r = header + 1 To last
         If Len(Trim$(CStr(src.Cells(r, 2).Value2))) > 0 Then _
             currentCode = Trim$(CStr(src.Cells(r, 2).Value2))
@@ -624,6 +631,7 @@ Private Sub EnsureOverview(ByVal src As Worksheet)
         End If
     Next r
     If nextR = MODEL_START_ROW Then Err.Raise vbObjectError + 171, , "No model IDs found in B for numeric H40 detail rows"
+    mV3Stage = "O07 set integer validations"
     ApplyWholeNumberValidation ov.Range("B5:B6")
     ApplyWholeNumberValidation ov.Range("B" & MODEL_START_ROW & ":B" & nextR - 1)
     ApplyWholeNumberValidation ov.Range("E" & MODEL_START_ROW & ":P" & nextR - 1)
@@ -634,7 +642,9 @@ Private Sub EnsureOverview(ByVal src As Worksheet)
     ov.Range("E5").Formula = "=IF(COUNT(Base26!D2:D10000)=0,"""",SUM(Base26!D2:D10000))"
     ov.Range("E7").Formula = "=IFERROR(E6/E5-1,"""")"
     ov.Range("E7").NumberFormat = "0.00%"
+    mV3Stage = "O08 prepare monthly chart data"
     PrepareMonthlyTotalData ov, nextR - 1
+    mV3Stage = "O09 create trend chart"
     CreateSetQtyTrendChart ov
 End Sub
 
@@ -684,24 +694,34 @@ Public Sub GenerateSeasonalSetQtyPlanV3()
     Dim weight As Double, unassigned As Long, targetCell As Variant, msg As String
     Dim w As Variant, ws As Worksheet
     On Error GoTo Failed
+    mV3Stage = "G01 locate source Sheet1 / Budget_Data"
     Set src = SourceSheet()
     If src Is Nothing Then Err.Raise vbObjectError + 180, , "No imported source data"
+    mV3Stage = "G02 migrate or create Budget_Detail"
     MigrateOldPanel
     ' Make this macro safe to run directly without first running Setup.
     If FindSheet(PANEL_SHEET) Is Nothing Or FindSheet(PLAN_SHEET) Is Nothing Or FindSheet(BASE_SHEET) Is Nothing Then
         SetupBudgetOptimizerSheet1
     End If
     If FindSheet(PANEL_SHEET) Is Nothing Then Err.Raise vbObjectError + 193, , "Budget_Detail initialization failed. Run SetupBudgetOptimizerV3."
+    mV3Stage = "G03 build Budget_Overview and model list"
     EnsureOverview src
+    mV3Stage = "G04 obtain Budget_Overview worksheet"
     Set ov = FindSheet(OVERVIEW_SHEET)
     If ov Is Nothing Then Err.Raise vbObjectError + 194, , "Budget_Overview initialization failed."
     fy = CLng(ov.Range("B3").Value2)
-    FindSheet(PANEL_SHEET).Range("E3").Value2 = fy
+    mV3Stage = "G05 sync fiscal year to Budget_Detail"
+    Dim detail As Worksheet
+    Set detail = FindSheet(PANEL_SHEET)
+    If detail Is Nothing Then Err.Raise vbObjectError + 193, , "Budget_Detail missing after initialization"
+    detail.Range("E3").Value2 = fy
+    mV3Stage = "G06 locate model rows"
     lastR = ov.Cells(ov.Rows.Count, "A").End(xlUp).Row
     If lastR < MODEL_START_ROW Then Err.Raise vbObjectError + 181, , "No models in Overview"
     If Not IsNumeric(ov.Range("B6").Value2) Then Err.Raise vbObjectError + 182, , "Enter 27F TTL target in B6"
     yearTarget = CDbl(ov.Range("B6").Value2)
     If yearTarget <= 0 Or yearTarget <> Fix(yearTarget) Then Err.Raise vbObjectError + 183, , "27F TTL target must be a positive integer"
+    mV3Stage = "G07 read per-model annual goals"
     ReDim targets(MODEL_START_ROW To lastR)
     ReDim hasTarget(MODEL_START_ROW To lastR)
     For r = MODEL_START_ROW To lastR
@@ -727,6 +747,7 @@ Public Sub GenerateSeasonalSetQtyPlanV3()
         If MsgBox("Regenerate seasonal plan? This replaces all existing E:P monthly manual adjustments.", _
              vbYesNo + vbQuestion) <> vbYes Then Exit Sub
     End If
+    mV3Stage = "G08 generate seasonal 12-month distribution"
     w = Array(69#, 74#, 80#, 86#, 94#, 100#, 72#, 80#, 89#, 97#, 71#, 88#)
     For r = MODEL_START_ROW To lastR
         machineGoal = targets(r)
@@ -742,15 +763,21 @@ Public Sub GenerateSeasonalSetQtyPlanV3()
             ov.Cells(r, 5 + m).Value2 = RoundTwoSignificant(machineGoal * CDbl(w(m)) / 1000#)
         Next m
     Next r
+    mV3Stage = "G09 activate plan"
     ov.Range("B10").Value2 = "ACTIVE"
+    mV3Stage = "G10 refresh Budget_Trial"
     RefreshBudgetSheet1Preview
+    mV3Stage = "G11 activate Overview after refresh"
     ov.Activate
     msg = "Seasonal plan generated; model quantities linked to Budget_Trial." & vbCrLf & _
           "Adjust E:P directly to see live amount changes (Excel calculation must be Automatic)."
     MsgBox msg, vbInformation
     Exit Sub
 Failed:
-    MsgBox "Seasonal plan failed (" & Err.Number & "): " & Err.Description, vbExclamation
+    MsgBox "Seasonal plan failed (" & Err.Number & ")" & vbCrLf & _
+           "Stage: " & mV3Stage & vbCrLf & _
+           "Model row: " & r & " / Month index: " & m & vbCrLf & _
+           Err.Description, vbExclamation
 End Sub
 
 Private Function RoundTwoSignificant(ByVal x As Double) As Double
