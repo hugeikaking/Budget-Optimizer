@@ -141,6 +141,13 @@ Public Sub RefreshBudgetSheet1Preview()
         Set pl = FindSheet(PLAN_SHEET)
         Set b = FindSheet(BASE_SHEET)
     End If
+    ' Upgrade labels in existing panels too (Setup skips pre-existing sheets).
+    panel.Range("D3").Value2 = "Fiscal year (Apr-Mar)"
+    panel.Range("B5").Value2 = "26F full-FY (manual + delta)"
+    panel.Range("C5").Value2 = "26F in-window Apr-Mar"
+    panel.Range("D5").Value2 = "Focus FY in-window"
+    panel.Range("A12").Value2 = "Focus FY Sales Amt"
+    panel.Range("D11").Value2 = "All H40 focus-FY Sales Amt"
     h40 = Trim$(CStr(panel.Range("B3").Value2))
     If Len(h40) = 0 Then Err.Raise vbObjectError + 102, , "Choose H40 in Budget_Panel!B3"
     If Not IsNumeric(panel.Range("E3").Value2) Then Err.Raise vbObjectError + 103, , "Focus year must be numeric"
