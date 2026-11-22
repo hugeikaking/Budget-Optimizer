@@ -322,7 +322,8 @@ Private Sub ApplyPlan(ByVal ws As Worksheet, ByVal pl As Worksheet, ByVal planRo
             raw = pl.Cells(planRow, "H").Value2
             If Len(Trim$(CStr(raw))) > 0 Then
                 If Not IsNumeric(raw) Then Err.Raise vbObjectError + 129, , "Invalid Comp Ratio"
-                If CDbl(raw) < 0 Or CDbl(raw) > 100 Then Err.Raise vbObjectError + 130, , "Comp Ratio must be 0-100"
+                If CDbl(raw) < 0 Or CDbl(raw) > 100 Or CDbl(raw) <> Fix(CDbl(raw)) Then _
+                    Err.Raise vbObjectError + 130, , "Comp Ratio must be a whole number from 0 to 100"
                 ws.Cells(rowNum, 64 + mm).Value2 = CDbl(raw)
             End If
         End If
