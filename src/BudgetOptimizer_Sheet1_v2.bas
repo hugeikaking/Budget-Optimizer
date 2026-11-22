@@ -147,7 +147,7 @@ Public Sub RefreshBudgetSheet1Preview()
     focusYear = CLng(panel.Range("E3").Value2)
     If focusYear < 2026 Or focusYear > 2100 Then Err.Raise vbObjectError + 104, , "Invalid focus year"
     FindRollingMonths src, keys, headerRow
-    firstDataRow = headerRow + 1
+    firstDataRow = FindFirstBudgetDataRow(src, headerRow)
     lastRow = src.Cells(src.Rows.Count, H40_COL).End(xlUp).Row
     If lastRow < firstDataRow Then Err.Raise vbObjectError + 105, , "No data rows below month header"
     RefreshH40List src, panel, b
@@ -172,7 +172,7 @@ Public Sub RefreshBudgetSheet1Preview()
     trial.Calculate
     src.Calculate
     For r = firstDataRow To lastRow
-        If StrComp(Trim$(CStr(trial.Cells(r, H40_COL).Value2)), h40, vbTextCompare) = 0 Then
+        If IsBudgetDataRow(trial, r) And StrComp(Trim$(CStr(trial.Cells(r, H40_COL).Value2)), h40, vbTextCompare) = 0 Then
             found = True
             For m = 0 To MONTH_COUNT - 1
                 ReadMetrics trial, r, m, vals
@@ -180,16 +180,18 @@ Public Sub RefreshBudgetSheet1Preview()
                 If keys(m) \ 100 = focusYear Then AddMetrics curYear, vals
             Next m
         End If
+        If IsBudgetDataRow(trial, r) Then
         For m = 0 To MONTH_COUNT - 1
             If keys(m) \ 100 = focusYear Then
                 ReadMetrics trial, r, m, vals
                 AddMetrics allYear, vals
             End If
         Next m
+        End If
     Next r
     If Not found Then Err.Raise vbObjectError + 106, , "H40 not found in S column: " & h40
     For r = firstDataRow To lastRow
-        If StrComp(Trim$(CStr(src.Cells(r, H40_COL).Value2)), h40, vbTextCompare) = 0 Then
+        If IsBudgetDataRow(src, r) And StrComp(Trim$(CStr(src.Cells(r, H40_COL).Value2)), h40, vbTextCompare) = 0 Then
             For m = 0 To MONTH_COUNT - 1
                 If keys(m) \ 100 = 2026 Then
                     ReadMetrics src, r, m, vals
@@ -235,6 +237,46 @@ Failed:
     Application.ScreenUpdating = True
     MsgBox message, vbExclamation
 End Sub
+
+' Detect first actual data row after multiple date/title/memo header rows.
+' Only matches rows with a nonblank H40 in S and at least two numeric budget inputs.
+Private Function FindFirstBudgetDataRow(ByVal ws As Worksheet, ByVal monthHeaderRow As Long) As Long
+    Dim r As Long, lastR As Long
+    lastR = ws.Cells(ws.Rows.Count, H40_COL).End(xlUp).Row
+    For r = monthHeaderRow + 1 To Application.Min(lastR, monthHeaderRow + 100)
+        If IsBudgetDataRow(ws, r) Then
+            FindFirstBudgetDataRow = r
+            Exit Function
+        End If
+    Next r
+    Err.Raise vbObjectError + 143, , "Could not locate first numeric budget row below the month header at row " & monthHeaderRow & ". Check S H40 and budget columns."
+End Function
+
+' A row is eligible when S holds a H40 and two independent input blocks
+' contain numeric values. Prevents labels like Set Number +2M being read as data.
+Private Function IsBudgetDataRow(ByVal ws As Worksheet, ByVal r As Long) As Boolean
+    Dim s As String, m As Long, countBlocks As Long, blockNo As Long
+    Dim bases As Variant, v As Variant
+    s = Trim$(CStr(ws.Cells(r, H40_COL).Value2))
+    If Len(s) = 0 Then Exit Function
+    If LCase$(s) = "h40" Or LCase$(s) = "eop" Then Exit Function
+    bases = Array(24, 44, 64, 84, 104)
+    For blockNo = 0 To 4
+        For m = 0 To MONTH_COUNT - 1
+            v = ws.Cells(r, CLng(bases(blockNo)) + m).Value2
+            If Not IsError(v) Then
+                If Len(Trim$(CStr(v))) > 0 And IsNumeric(v) Then
+                    countBlocks = countBlocks + 1
+                    Exit For
+                End If
+            End If
+        Next m
+        If countBlocks >= 2 Then
+            IsBudgetDataRow = True
+            Exit Function
+        End If
+    Next blockNo
+End Function
 
 Private Sub ApplyPlan(ByVal ws As Worksheet, ByVal pl As Worksheet, ByVal planRow As Long, ByVal firstData As Long, ByVal lastData As Long, ByRef months() As Long)
     Dim rowNum As Long, fromMonth As Long, toMonth As Long, mm As Long
@@ -413,7 +455,7 @@ Private Sub RefreshH40List(ByVal src As Worksheet, ByVal p As Worksheet, ByVal b
     last = src.Cells(src.Rows.Count, "S").End(xlUp).Row
     For r = 2 To last
         key = Trim$(CStr(src.Cells(r, "S").Value2))
-        If Len(key) > 0 And LCase$(key) <> "h40" And LCase$(key) <> "eop" Then
+        If IsBudgetDataRow(src, r) And Len(key) > 0 And LCase$(key) <> "h40" And LCase$(key) <> "eop" Then
             If Not dict.Exists(key) Then dict.Add key, key
         End If
     Next r
