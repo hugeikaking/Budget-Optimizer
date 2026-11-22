@@ -269,6 +269,7 @@ Failed:
     Application.DisplayAlerts = True
     Application.EnableEvents = True
     Application.ScreenUpdating = True
+    On Error GoTo 0
     If silent Then
         Err.Raise vbObjectError + 209, "RefreshBudgetSheet1Preview", message
     Else
