@@ -751,15 +751,38 @@ End Sub
 
 Private Sub CreateSetQtyTrendChart(ByVal ov As Worksheet)
     Dim co As ChartObject
+    Dim topPos As Double, spaceBelow As Double, fitHeight As Double, fitWidth As Double
     On Error Resume Next
     Set co = ov.ChartObjects("V3_SetQTY_Trend")
     On Error GoTo 0
-    If Not co Is Nothing Then Exit Sub
-    Set co = ov.ChartObjects.Add(ov.Range("A20").Left, ov.Range("A20").Top, 860, 255)
-    co.Name = "V3_SetQTY_Trend"
+
+    topPos = ov.Range("A20").Top
+    ' Keep a visible gap above row 39 where the model table starts.
+    spaceBelow = ov.Range("A39").Top - topPos - 16#
+    If spaceBelow < 110# Then
+        Err.Raise vbObjectError + 195, , "Not enough vertical space for the Set QTY chart above row 39. Check row heights 20:38."
+    End If
+    fitHeight = Application.Min(230#, spaceBelow)
+    fitWidth = Application.Min(860#, ov.Range("Q20").Left + ov.Range("Q20").Width - ov.Range("A20").Left - 12#)
+
+    If co Is Nothing Then
+        Set co = ov.ChartObjects.Add(ov.Range("A20").Left, topPos, fitWidth, fitHeight)
+        co.Name = "V3_SetQTY_Trend"
+    End If
+
+    ' Always resize/reposition EXISTING charts too. The old version returned
+    ' early, leaving a stretched chart overlaying the row-39 model table.
+    ' xlFreeFloating prevents resizing when rows/columns are inserted.
+    With co
+        .Placement = xlFreeFloating
+        .Left = ov.Range("A20").Left
+        .Top = topPos
+        .Width = fitWidth
+        .Height = fitHeight
+    End With
     With co.Chart
         .ChartType = xlLineMarkers
-        .SetSourceData ov.Range("T1:U13")
+        .SetSourceData Source:=ov.Range("T1:U13")
         .HasTitle = True
         .ChartTitle.Text = "27F TTL Set QTY | monthly seasonality"
         .HasLegend = False
