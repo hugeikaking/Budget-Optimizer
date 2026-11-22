@@ -551,7 +551,13 @@ Private Sub EnsureOverview(ByVal src As Worksheet)
     If Len(CStr(ov.Range("A1").Value2)) = 0 Then
         ov.Range("A1").Value2 = "BUDGET OVERVIEW  |  MODEL SET QTY + TTL SALES AMT"
         ov.Range("A3").Value2 = "FY (Apr-Mar)"
-        ov.Range("B3").Value2 = FindSheet(PANEL_SHEET).Range("E3").Value2
+        ' A fresh V3 install may not have Budget_Detail yet.
+        ' Use FY 2027 as a safe starting default; Setup/refresh can sync later.
+        If FindSheet(PANEL_SHEET) Is Nothing Then
+            ov.Range("B3").Value2 = 2027
+        Else
+            ov.Range("B3").Value2 = FindSheet(PANEL_SHEET).Range("E3").Value2
+        End If
         ov.Range("A5").Value2 = "26F TTL Set QTY (manual)"
         ov.Range("A6").Value2 = "27F TTL target (manual)"
         ov.Range("A7").Value2 = "27F model plan TTL (unique)"
@@ -680,8 +686,15 @@ Public Sub GenerateSeasonalSetQtyPlanV3()
     On Error GoTo Failed
     Set src = SourceSheet()
     If src Is Nothing Then Err.Raise vbObjectError + 180, , "No imported source data"
+    MigrateOldPanel
+    ' Make this macro safe to run directly without first running Setup.
+    If FindSheet(PANEL_SHEET) Is Nothing Or FindSheet(PLAN_SHEET) Is Nothing Or FindSheet(BASE_SHEET) Is Nothing Then
+        SetupBudgetOptimizerSheet1
+    End If
+    If FindSheet(PANEL_SHEET) Is Nothing Then Err.Raise vbObjectError + 193, , "Budget_Detail initialization failed. Run SetupBudgetOptimizerV3."
     EnsureOverview src
     Set ov = FindSheet(OVERVIEW_SHEET)
+    If ov Is Nothing Then Err.Raise vbObjectError + 194, , "Budget_Overview initialization failed."
     fy = CLng(ov.Range("B3").Value2)
     FindSheet(PANEL_SHEET).Range("E3").Value2 = fy
     lastR = ov.Cells(ov.Rows.Count, "A").End(xlUp).Row
