@@ -1,0 +1,13 @@
+' Paste this code into ThisWorkbook (Microsoft Excel Objects), NOT a standard Module.
+' Workbook event handles Budget_Detail edits and H40 selection automatically.
+Option Explicit
+
+Private Sub Workbook_SheetChange(ByVal Sh As Object, ByVal Target As Range)
+    On Error GoTo Failed
+    If Not TypeOf Sh Is Worksheet Then Exit Sub
+    If Sh.Name <> "Budget_Detail" Then Exit Sub
+    BudgetV4_OnDetailChange Target
+    Exit Sub
+Failed:
+    MsgBox "Budget V4 workbook event failed (" & Err.Number & "): " & Err.Description, vbExclamation
+End Sub
