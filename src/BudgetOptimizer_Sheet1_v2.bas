@@ -375,8 +375,9 @@ Invalid:
 End Function
 
 Private Function SourceSheet() As Worksheet
-    Set SourceSheet = FindSheet(SOURCE_LOCAL)
-    If SourceSheet Is Nothing Then Set SourceSheet = FindSheet(SOURCE_IMPORTED)
+    ' Prefer latest explicitly imported snapshot, then a pasted local Sheet1.
+    Set SourceSheet = FindSheet(SOURCE_IMPORTED)
+    If SourceSheet Is Nothing Then Set SourceSheet = FindSheet(SOURCE_LOCAL)
 End Function
 
 Private Function FindSheet(ByVal name As String) As Worksheet
