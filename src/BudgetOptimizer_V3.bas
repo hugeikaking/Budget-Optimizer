@@ -661,6 +661,15 @@ Private Sub EnsureOverview(ByVal src As Worksheet)
             End If
         End If
     Next r
+    ' Resolve Model names even when source M is populated later within the same B group.
+    For m = MODEL_START_ROW To nextR - 1
+        currentCode = Trim$(CStr(ov.Cells(m, 19).Value2))
+        If labelByCode.Exists(currentCode) Then
+            ov.Cells(m, 1).Value2 = labelByCode(currentCode)
+        Else
+            ov.Cells(m, 1).Value2 = "(Model missing in M)"
+        End If
+    Next m
     If nextR = MODEL_START_ROW Then Err.Raise vbObjectError + 171, , "No model IDs found in B for numeric H40 detail rows"
     mV3Stage = "O07 set integer validations"
     ApplyWholeNumberValidation ov.Range("B5:B6")
