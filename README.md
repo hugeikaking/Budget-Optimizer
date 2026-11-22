@@ -28,3 +28,13 @@ V2 的原始四项指标、财年汇总、Pcs/Set 和 S/P 试算等已经在公�
 ## 本地与隐私
 
 用户 Windows 项目目录：`E:\WaPJTS\预算表优化`。公司数据只留在用户本地，勿将公司真实数据、业务价格和工作簿上传 GitHub。
+
+## V4 自动交互测试版（最新）
+
+V4 正在公司 Excel 验收中，已完成源码与事件类提交；**V3 仍是最近一个实际验证过的版本**。
+
+- [V4 VBA 主模块](src/BudgetOptimizer_V4.bas)
+- [V4 Excel 事件类](src/C_BudgetV4Events.cls)
+- [V4 双文件安装与验收说明](docs/V4_自动H40操作与验收.md)
+
+V4 的 `Budget_Detail` H40 下拉框自动填充明细表；修改 Pcs/Set、S/P 或解锁后的 Share、Comp Ratio 会自动刷新试算与第一页 TTL Sales Amt。V4 需**同时导入 .bas 和 .cls**，旧 V3 公共模块需先移除。升级前备份本地工作簿。
