@@ -618,6 +618,9 @@ Private Sub EnsureOverview(ByVal src As Worksheet)
         End If
     Next r
     If nextR = MODEL_START_ROW Then Err.Raise vbObjectError + 171, , "No model IDs found in B for numeric H40 detail rows"
+    ApplyWholeNumberValidation ov.Range("B5:B6")
+    ApplyWholeNumberValidation ov.Range("B" & MODEL_START_ROW & ":B" & nextR - 1)
+    ApplyWholeNumberValidation ov.Range("E" & MODEL_START_ROW & ":P" & nextR - 1)
     ov.Range("B7").Formula = "=SUM(D" & MODEL_START_ROW & ":D" & nextR - 1 & ")"
     ov.Range("B8").Formula = "=IFERROR(B7/B5-1,"""")"
     ov.Range("B9").Formula = "=IFERROR(B7/B6-1,"""")"
@@ -638,6 +641,17 @@ Private Sub PrepareMonthlyTotalData(ByVal ov As Worksheet, ByVal lastModel As Lo
         ov.Cells(m + 2, 20).Value2 = txt
         ov.Cells(m + 2, 21).Formula = "=SUM(" & ov.Cells(MODEL_START_ROW, m + 5).Address(False, False) & ":" & ov.Cells(lastModel, m + 5).Address(False, False) & ")"
     Next m
+End Sub
+
+Private Sub ApplyWholeNumberValidation(ByVal rng As Range)
+    On Error Resume Next
+    rng.Validation.Delete
+    rng.Validation.Add Type:=xlValidateWholeNumber, AlertStyle:=xlValidAlertStop, _
+        Operator:=xlBetween, Formula1:="0", Formula2:="999999999"
+    rng.Validation.ErrorTitle = "Set QTY must be a whole number"
+    rng.Validation.ErrorMessage = "Only nonnegative integer quantities are allowed."
+    rng.Validation.ShowError = True
+    On Error GoTo 0
 End Sub
 
 Private Sub CreateSetQtyTrendChart(ByVal ov As Worksheet)
@@ -695,6 +709,10 @@ Public Sub GenerateSeasonalSetQtyPlanV3()
     remaining = yearTarget - fixedTotal
     If unassigned = 0 And remaining > 0 Then
         If MsgBox("All model targets specified but total differs from TTL target by " & Format(remaining, "#,##0") & ". Proceed without silently allocating the difference?", vbYesNo + vbExclamation) <> vbYes Then Exit Sub
+    End If
+    If UCase$(Trim$(CStr(ov.Range("B10").Value2))) = "ACTIVE" Then
+        If MsgBox("Regenerate seasonal plan? This replaces all existing E:P monthly manual adjustments.", _
+             vbYesNo + vbQuestion) <> vbYes Then Exit Sub
     End If
     w = Array(69#, 74#, 80#, 86#, 94#, 100#, 72#, 80#, 89#, 97#, 71#, 88#)
     For r = MODEL_START_ROW To lastR
@@ -830,5 +848,6 @@ Private Sub LinkOverviewSummary(ByVal trial As Worksheet, ByVal firstR As Long, 
             Next m
         End If
     Next r
-    ov.Range("E8").Formula = "=E6-" & Format(orig, "0.############")
+    ov.Range("R5").Value2 = orig
+    ov.Range("E8").Formula = "=E6-R5"
 End Sub
