@@ -361,7 +361,7 @@ Private Function ParseMonth(ByVal v As Variant) As Long
     End If
     s = Replace(CStr(v), vbLf, " ")
     Set re = CreateObject("VBScript.RegExp")
-    re.Pattern = "(20[0-9]{2})[_/\-](0?[1-9]|1[0-2])"
+    re.Pattern = "(20[0-9]{2})[_/\-](1[0-2]|0?[1-9])([^0-9]|$)"
     re.Global = False
     If re.Test(s) Then
         Set ms = re.Execute(s)
