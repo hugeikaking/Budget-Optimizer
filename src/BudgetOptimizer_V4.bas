@@ -144,7 +144,8 @@ Public Sub RefreshBudgetSheet1Preview(Optional ByVal silent As Boolean = False)
     Dim cur26(1 To 4) As Double, old26(1 To 4) As Double
     Dim curYear(1 To 4) As Double, allYear(1 To 4) As Double
     Dim vals(1 To 4) As Double, numEdits As Long, found As Boolean, n As Long
-    Dim baseVal As Variant, origAlerts As Boolean
+    Dim baseVal As Variant, origAlerts As Boolean, origEvents As Boolean
+    origEvents = Application.EnableEvents
     On Error GoTo Failed
     Set src = SourceSheet()
     If src Is Nothing Then Err.Raise vbObjectError + 101, , "Sheet1/Budget_Data not found. Run ImportBudgetSheet1 or add Sheet1."
@@ -258,7 +259,7 @@ Public Sub RefreshBudgetSheet1Preview(Optional ByVal silent As Boolean = False)
     End If
 Cleanup:
     Application.DisplayAlerts = origAlerts
-    Application.EnableEvents = True
+    Application.EnableEvents = origEvents
     Application.ScreenUpdating = True
     Exit Sub
 Failed:
@@ -266,7 +267,7 @@ Failed:
     message = "Preview failed (" & Err.Number & "): " & Err.Description
     On Error Resume Next
     Application.DisplayAlerts = True
-    Application.EnableEvents = True
+    Application.EnableEvents = origEvents
     Application.ScreenUpdating = True
     On Error GoTo 0
     If silent Then
@@ -1073,6 +1074,7 @@ Public Sub SetupBudgetOptimizerV4()
     Dim panel As Worksheet, src As Worksheet
     On Error GoTo Failed
     prevEvents = Application.EnableEvents
+    gV4Busy = True
     Application.EnableEvents = False
     SetupBudgetOptimizerV3
     Set panel = FindSheet(PANEL_SHEET)
@@ -1084,11 +1086,13 @@ Public Sub SetupBudgetOptimizerV4()
     If FindSheet(TRIAL_SHEET) Is Nothing Then RefreshBudgetSheet1Preview True
     LoadDetailEditorV4
     Application.EnableEvents = prevEvents
+    gV4Busy = False
     panel.Activate
     MsgBox "V4 enabled. Choose H40 in Budget_Detail!B3; edit proposed F:I in the row editor. Changes refresh automatically.", vbInformation
     Exit Sub
 Failed:
-    Application.EnableEvents = True
+    Application.EnableEvents = prevEvents
+    gV4Busy = False
     MsgBox "V4 setup failed (" & Err.Number & "): " & Err.Description, vbExclamation
 End Sub
 
