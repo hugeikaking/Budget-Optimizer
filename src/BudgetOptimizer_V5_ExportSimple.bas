@@ -90,12 +90,11 @@ Public Sub ExportBudgetV5SimpleCopy()
         Next area
     End If
 
-    ' All defined names are unnecessary in a static review copy. Remove them
-    ' ONLY from the newly created output book to prevent phantom workbook links.
-    stage = "Removing copied tool names from output only"
-    For i = outBook.Names.Count To 1 Step -1
-        outBook.Names(i).Delete
-    Next i
+    ' Do not delete every Excel-defined name. Built-in/hidden names may
+    ' reject deletion with error 1004. Only the known V4 H40 dropdown helper
+    ' can create a cross-workbook link when Sheet1 is copied alone.
+    stage = "Removing copied BudgetH40Options helper from output only"
+    SimpleRemoveCopiedH40Name outBook
 
     ' Compare the same five input blocks used by Budget_Trial row C flag.
     ' X:AQ, AR:BK, BL:CE, CF:CY, CZ:DS.
@@ -207,3 +206,36 @@ Private Function SimpleDifferent(ByVal oldValue As Variant, ByVal newValue As Va
         SimpleDifferent = CStr(oldValue) <> CStr(newValue)
     End If
 End Function
+
+
+' Only remove V4's known internal dropdown name from the NEW output workbook.
+' Other defined names are retained; later LinkSources validation is still strict.
+Private Sub SimpleRemoveCopiedH40Name(ByVal copiedBook As Workbook)
+    Dim i As Long, oneName As Name, localName As String
+    Dim bangAt As Long, referText As String, deleteFailure As String
+
+    For i = copiedBook.Names.Count To 1 Step -1
+        Set oneName = copiedBook.Names(i)
+        localName = oneName.Name
+        bangAt = InStrRev(localName, "!")
+        If bangAt > 0 Then localName = Mid$(localName, bangAt + 1)
+        If StrComp(localName, "BudgetH40Options", vbTextCompare) = 0 Then
+            referText = vbNullString
+            On Error Resume Next
+            referText = oneName.RefersTo
+            On Error GoTo 0
+            If InStr(1, referText, "[", vbBinaryCompare) > 0 And _
+               InStr(1, referText, "]", vbBinaryCompare) > 0 Then
+                On Error Resume Next
+                oneName.Delete
+                If Err.Number <> 0 Then
+                    deleteFailure = Err.Description
+                    Err.Clear
+                End If
+                On Error GoTo 0
+                If Len(deleteFailure) > 0 Then Err.Raise vbObjectError + 710, , _
+                    "Could not delete copied BudgetH40Options helper: " & deleteFailure
+            End If
+        End If
+    Next i
+End Sub
