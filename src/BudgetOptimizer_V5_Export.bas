@@ -358,10 +358,17 @@ Private Sub ExportAuditCopiedLinks(ByVal src As Worksheet, _
         "The source workbook itself lists external links (example: " & _
         Left$(linkExample, 180) & "). Review the original workbook dependencies."
 
-    ' Copying a sheet can turn unused defined names into external links.
-    ' Since we cannot establish their usage inside charts, data validation
-    ' or conditional formatting reliably, do not silently delete them.
-    ' Instead display their presence and stop with the specific cause.
+    ' BudgetH40Options is a tool-only dropdown name defined by V4 for
+    ' Budget_Detail!B3, not part of the customer's budget Sheet1.
+    ' It can become an external name when copying Budget_Data alone.
+    ' Remove this one exact known helper ONLY from the new output workbook.
+    ' Do not use Workbooks.BreakLink or modify the source workbook.
+    ExportRemoveToolOnlyH40Name outputBook
+    destLinks = outputBook.LinkSources(Type:=xlExcelLinks)
+    If Not IsArray(destLinks) Then Exit Sub
+
+    ' Any other remaining copied name is not automatically discarded.
+    ' Report its identity so that genuine budget dependencies stay intact.
     Dim nmSample As String, nmCount As Long, refersText As String
     For Each nm In outputBook.Names
         refersText = vbNullString
@@ -395,4 +402,29 @@ Private Sub ExportAuditCopiedLinks(ByVal src As Worksheet, _
         "Copied sheet has external link(s) but no cell formula reference found." & _
         " First linked workbook: " & Left$(linkExample, 180) & _
         ". May be chart, object, connection or hidden name."
+End Sub
+
+
+Private Sub ExportRemoveToolOnlyH40Name(ByVal outBook As Workbook)
+    Dim idx As Long, nm As Name, shortName As String
+    Dim refersText As String, splitPos As Long
+
+    ' Loop backwards because deleting a name changes the Names collection.
+    For idx = outBook.Names.Count To 1 Step -1
+        Set nm = outBook.Names(idx)
+        shortName = nm.Name
+        splitPos = InStrRev(shortName, "!")
+        If splitPos > 0 Then shortName = Mid$(shortName, splitPos + 1)
+        If StrComp(shortName, "BudgetH40Options", vbTextCompare) = 0 Then
+            refersText = vbNullString
+            On Error Resume Next
+            refersText = nm.RefersTo
+            On Error GoTo 0
+            ' Only remove the helper when its copy points outside this workbook.
+            If InStr(1, refersText, "[", vbBinaryCompare) > 0 And _
+               InStr(1, refersText, "]", vbBinaryCompare) > 0 Then
+                nm.Delete
+            End If
+        End If
+    Next idx
 End Sub
