@@ -321,14 +321,9 @@ End Function
 Private Sub ExportAuditCopiedLinks(ByVal src As Worksheet, _
     ByVal outputBook As Workbook, ByVal copiedSheet As Worksheet)
     Dim sourceLinks As Variant, destLinks As Variant
-    Dim nm As Name, ws As Worksheet, rangeName As Name
-    Dim externalFormulaCount As Long, exampleCell As String
-    Dim usedNames As Object, nameKey As String, srcFormula As String
-    Dim it As Range, formulaCells As Range, c As Range
-    Dim removed As Long, linkExample As String
-    Dim fullRef As String, plainRef As String, externalRef As Boolean
-    Dim namesToDelete As Collection, candidate As Variant
-    Dim suspicious As Boolean
+    Dim nm As Name, externalFormulaCount As Long, exampleCell As String
+    Dim srcFormula As String, formulaCells As Range, c As Range
+    Dim linkExample As String
 
     sourceLinks = src.Parent.LinkSources(Type:=xlExcelLinks)
     destLinks = outputBook.LinkSources(Type:=xlExcelLinks)
@@ -367,14 +362,14 @@ Private Sub ExportAuditCopiedLinks(ByVal src As Worksheet, _
     ' Since we cannot establish their usage inside charts, data validation
     ' or conditional formatting reliably, do not silently delete them.
     ' Instead display their presence and stop with the specific cause.
-    Dim nmSample As String, nmCount As Long, ref As String
+    Dim nmSample As String, nmCount As Long, refersText As String
     For Each nm In outputBook.Names
-        ref = vbNullString
+        refersText = vbNullString
         On Error Resume Next
-        ref = nm.RefersTo
+        refersText = nm.RefersTo
         On Error GoTo 0
-        If InStr(1, ref, "[", vbBinaryCompare) > 0 And _
-           InStr(1, ref, "]", vbBinaryCompare) > 0 Then
+        If InStr(1, refersText, "[", vbBinaryCompare) > 0 And _
+           InStr(1, refersText, "]", vbBinaryCompare) > 0 Then
             nmCount = nmCount + 1
             If Len(nmSample) = 0 Then nmSample = nm.Name
         End If
