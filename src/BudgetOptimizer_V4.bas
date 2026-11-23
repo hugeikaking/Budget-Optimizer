@@ -1423,8 +1423,10 @@ Private Sub InstallTrialChangedRowFlagsV4(ByVal trial As Worksheet, _
                 sourceRange = quotedSheet & src.Range(src.Cells(rr, firstCol), _
                     src.Cells(rr, lastCol)).Address(False, False)
                 If Len(compareExpr) > 0 Then compareExpr = compareExpr & "+"
-                compareExpr = compareExpr & "SUMPRODUCT(--(IFERROR(" & trialRange & _
-                    ","""")<>IFERROR(" & sourceRange & ","""")))"
+                ' Direct range comparison: validated by Excel SUMPRODUCT test.
+                ' On input errors, conservatively show C rather than miss a change.
+                compareExpr = compareExpr & "IFERROR(SUMPRODUCT(--(" & trialRange & _
+                    "<>" & sourceRange & ")),1)"
             Next k
             formulaText = "=IF((" & compareExpr & ")>0,""C"","""")"
             trial.Cells(rr, 1).Formula = formulaText
