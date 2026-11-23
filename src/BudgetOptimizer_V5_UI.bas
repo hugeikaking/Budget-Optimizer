@@ -82,10 +82,21 @@ Public Sub SetupBudgetOptimizerV5UI()
         FormatMetricCell .Range("L5:O6"), True
         FormatMetricCell .Range("H9:K10"), False
         FormatMetricCell .Range("L9:O10"), False
+        ' Global 27F sales amount target belongs to Overview, not individual H40.
+        ' Keep this manually editable value in Overview!E9; never overwrite it on rerun.
         .Range("H12:O12").Merge
         .Range("H12").Value2 = "Blue = live trial   |   Yellow = editable input   |   Gray = source reference"
         .Range("H12").Font.Color = RGB(95, 111, 131)
         .Range("H12").Font.Italic = True
+        .Range("H13").Value2 = "27F TTL Sales Amt TARGET"
+        .Range("L13").Value2 = "27F TTL Sales Amt GAP (actual - target)"
+        .Range("H13:O13").Font.Color = RGB(91, 107, 124)
+        .Range("H14:K15").Merge
+        .Range("L14:O15").Merge
+        .Range("H14").Formula = "=IF('" & OVERVIEW_TAB & "'!E9="""","""",'" & OVERVIEW_TAB & "'!E9)"
+        .Range("L14").Formula = "=IF('" & OVERVIEW_TAB & "'!E9="""","""",'" & OVERVIEW_TAB & "'!E10)"
+        FormatMetricCell .Range("H14:K15"), False
+        FormatMetricCell .Range("L14:O15"), False
 
         .Range("A11").Font.Bold = True
         .Range("D11").Font.Bold = True
@@ -167,6 +178,27 @@ Public Sub SetupBudgetOptimizerV5UI()
         .Activate
         .Range("A23").Select
     End With
+
+    ' Global sales amount target, separate from Overview B6 (Set QTY target).
+    ' Do not clear or overwrite any existing E9 manual input.
+    ov.Range("D9").Value2 = "27F TTL Sales Amt Target (manual)"
+    ov.Range("D10").Value2 = "27F TTL Sales Amt Gap (actual - target)"
+    ov.Range("E9").NumberFormat = "#,##0;[Red]-#,##0;0"
+    ov.Range("E9").Interior.Color = RGB(255, 244, 193)
+    On Error Resume Next
+    ov.Range("E9").Validation.Delete
+    On Error GoTo Failed
+    With ov.Range("E9").Validation
+        .Add Type:=xlValidateDecimal, AlertStyle:=xlValidAlertStop, _
+            Operator:=xlGreaterEqual, Formula1:="0"
+        .ErrorTitle = "Invalid sales amount target"
+        .ErrorMessage = "Enter a nonnegative 27F TTL Sales Amt target."
+        .ShowError = True
+    End With
+    ov.Range("E10").Formula = "=IF(E9="""","""",E6-E9)"
+    ov.Range("E10").NumberFormat = "#,##0;[Red]-#,##0;0"
+    ov.Range("E10").Interior.Color = RGB(228, 239, 250)
+    ov.Range("D9:D10").Font.Bold = True
 
     ' The Overview wording must match the now automatic V4 editor behavior.
     ov.Range("A16").Value2 = "4. Choose H40 in Budget_Detail; changing Pcs/Set or S/P recalculates trial automatically."
