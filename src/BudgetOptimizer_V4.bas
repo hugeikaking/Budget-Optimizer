@@ -200,6 +200,7 @@ Public Sub RefreshBudgetSheet1Preview(Optional ByVal silent As Boolean = False)
     Dim appliedSetCells As Long
     appliedSetCells = ApplyOverviewSetQty(trial, src, firstDataRow, lastRow, keys)
     BuildTrialSummaryFormulas trial, panel, firstDataRow, lastRow, keys, focusYear
+    InstallTrialChangedRowFlagsV4 trial, src, firstDataRow, lastRow
     trial.Calculate
     src.Calculate
     For r = firstDataRow To lastRow
@@ -1394,4 +1395,41 @@ Failed:
     Application.EnableEvents = True
     gV4Busy = False
     MsgBox message, vbExclamation
+End Sub
+
+
+' Dynamic C marker in Budget_Trial column A.
+' Compares the five 20-month editable blocks against the source worksheet.
+' This is recalculated by Excel when any linked Overview Set QTY changes;
+' it is reinstalled on every Trial rebuild (including Detail edits).
+' Only the temporary Budget_Trial A column is modified, never Budget_Data.
+Private Sub InstallTrialChangedRowFlagsV4(ByVal trial As Worksheet, _
+    ByVal src As Worksheet, ByVal firstR As Long, ByVal lastR As Long)
+    Dim bases As Variant, rr As Long, k As Long
+    Dim firstCol As Long, lastCol As Long
+    Dim formulaText As String, compareExpr As String, trialRange As String
+    Dim sourceRange As String, quotedSheet As String
+    quotedSheet = "'" & Replace(src.Name, "'", "''") & "'!"
+    bases = Array(24, 44, 64, 84, 104)  ' X, AR, BL, CF, CZ
+    trial.Cells(firstR - 1, 1).Value2 = "Change flag (C)"
+    For rr = firstR To lastR
+        If IsBudgetDataRow(src, rr) Then
+            compareExpr = vbNullString
+            For k = 0 To 4
+                firstCol = CLng(bases(k))
+                lastCol = firstCol + MONTH_COUNT - 1
+                trialRange = trial.Range(trial.Cells(rr, firstCol), _
+                    trial.Cells(rr, lastCol)).Address(False, False)
+                sourceRange = quotedSheet & src.Range(src.Cells(rr, firstCol), _
+                    src.Cells(rr, lastCol)).Address(False, False)
+                If Len(compareExpr) > 0 Then compareExpr = compareExpr & "+"
+                compareExpr = compareExpr & "SUMPRODUCT(--(IFERROR(" & trialRange & _
+                    ","""")<>IFERROR(" & sourceRange & ","""")))"
+            Next k
+            formulaText = "=IF((" & compareExpr & ")>0,""C"","""")"
+            trial.Cells(rr, 1).Formula = formulaText
+        End If
+    Next rr
+    trial.Columns(1).ColumnWidth = 17
+    trial.Range(trial.Cells(firstR, 1), trial.Cells(lastR, 1)).HorizontalAlignment = xlCenter
 End Sub
