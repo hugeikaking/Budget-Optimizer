@@ -38,3 +38,13 @@ V4 正在公司 Excel 验收中，已完成源码与事件类提交；**V3 仍�
 - [V4 双文件安装与验收说明](docs/V4_自动H40操作与验收.md)
 
 V4 的 `Budget_Detail` H40 下拉框自动填充明细表；修改 Pcs/Set、S/P 或解锁后的 Share、Comp Ratio 会自动刷新试算与第一页 TTL Sales Amt。V4 需**同时导入 .bas 和 .cls**，旧 V3 公共模块需先移除。升级前备份本地工作簿。
+
+
+## V5 Reviewed Export — 测试版
+
+V5 新增**独立**标黄预算导出模块（保留原 V4/V5_UI 模块和工作簿事件）：
+
+- [BudgetOptimizer_V5_Export.bas](src/BudgetOptimizer_V5_Export.bas)
+- [V5 标黄导出安装及验收](docs/V5_标黄导出与验收.md)
+
+在 `V5_Dev.xlsm` 导入并编译，运行 `ExportBudgetV5YellowCopy`。输出新的 `.xlsx`：原预算 Sheet1（仅 X:DS 真正变化的输入值标黄）与 Change_Log。**不会覆盖源文件；尚待公司 Excel 实机验收。**
