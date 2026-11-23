@@ -82,10 +82,13 @@ Public Sub SetupBudgetOptimizerV5UI()
         FormatMetricCell .Range("L5:O6"), True
         FormatMetricCell .Range("H9:K10"), False
         FormatMetricCell .Range("L9:O10"), False
+        ' Current calculated sales amount is green, distinct from yellow manual targets.
+        HighlightCurrentAmt .Range("H5:K6")
+        HighlightCurrentAmt .Range("H9:K10")
         ' Global 27F sales amount target belongs to Overview, not individual H40.
         ' Keep this manually editable value in Overview!E9; never overwrite it on rerun.
         .Range("H12:O12").Merge
-        .Range("H12").Value2 = "Blue = live trial   |   Yellow = editable input   |   Gray = source reference"
+        .Range("H12").Value2 = "Green = current Sales Amt   |   Yellow = manual Target   |   Gray = source" 
         .Range("H12").Font.Color = RGB(95, 111, 131)
         .Range("H12").Font.Italic = True
         .Range("H13").Value2 = "27F TTL Sales Amt TARGET"
@@ -97,10 +100,14 @@ Public Sub SetupBudgetOptimizerV5UI()
         .Range("L14").Formula = "=IF('" & OVERVIEW_TAB & "'!E9="""","""",'" & OVERVIEW_TAB & "'!E10)"
         FormatMetricCell .Range("H14:K15"), False
         FormatMetricCell .Range("L14:O15"), False
+        HighlightTargetAmt .Range("H14:K15")
 
         .Range("A11").Font.Bold = True
         .Range("D11").Font.Bold = True
         .Range("E11").Font.Bold = True
+        HighlightCurrentAmt .Range("E11")
+        HighlightCurrentAmt .Range("D8")
+        .Range("E6:E9").Interior.Color = RGB(255, 244, 193)
         .Range("A13").Font.Bold = True
         .Range("B13").NumberFormat = "0.00%;[Red]-0.00%;0.00%"
 
@@ -184,7 +191,8 @@ Public Sub SetupBudgetOptimizerV5UI()
     ov.Range("D9").Value2 = "27F TTL Sales Amt Target (manual)"
     ov.Range("D10").Value2 = "27F TTL Sales Amt Gap (actual - target)"
     ov.Range("E9").NumberFormat = "#,##0;[Red]-#,##0;0"
-    ov.Range("E9").Interior.Color = RGB(255, 244, 193)
+    HighlightTargetAmt ov.Range("E9")
+    HighlightTargetAmt ov.Range("B6")
     On Error Resume Next
     ov.Range("E9").Validation.Delete
     On Error GoTo Failed
@@ -198,6 +206,8 @@ Public Sub SetupBudgetOptimizerV5UI()
     ov.Range("E10").Formula = "=IF(E9="""","""",E6-E9)"
     ov.Range("E10").NumberFormat = "#,##0;[Red]-#,##0;0"
     ov.Range("E10").Interior.Color = RGB(228, 239, 250)
+    HighlightCurrentAmt ov.Range("E6")
+    HighlightTargetAmt ov.Range("B" & 40 & ":B" & ov.Cells(ov.Rows.Count, "S").End(xlUp).Row)
     ov.Range("D9:D10").Font.Bold = True
 
     ' The Overview wording must match the now automatic V4 editor behavior.
@@ -232,5 +242,23 @@ Private Sub FormatMetricCell(ByVal area As Range, ByVal isPercent As Boolean)
         End If
         .Borders.LineStyle = xlContinuous
         .Borders.Color = RGB(202, 218, 236)
+    End With
+End Sub
+
+' Color convention: actual/live Sales Amt is green; manual target is yellow.
+' This affects presentation only and never changes values, formulas or Excel events.
+Private Sub HighlightCurrentAmt(ByVal area As Range)
+    With area
+        .Interior.Color = RGB(222, 241, 225)
+        .Font.Color = RGB(24, 96, 54)
+        .Font.Bold = True
+    End With
+End Sub
+
+Private Sub HighlightTargetAmt(ByVal area As Range)
+    With area
+        .Interior.Color = RGB(255, 239, 166)
+        .Font.Color = RGB(102, 74, 12)
+        .Font.Bold = True
     End With
 End Sub
