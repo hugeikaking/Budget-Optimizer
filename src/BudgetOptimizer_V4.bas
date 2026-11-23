@@ -189,6 +189,8 @@ Public Sub RefreshBudgetSheet1Preview(Optional ByVal silent As Boolean = False)
     src.Copy After:=src
     Set trial = ActiveSheet
     trial.Name = TRIAL_SHEET
+    ' Copy activates Budget_Trial; immediately return to the editor for automatic updates.
+    If silent Then panel.Activate
     For r = 2 To pl.Cells(pl.Rows.Count, "B").End(xlUp).Row
         If UCase$(Trim$(CStr(pl.Cells(r, "A").Value2))) = "Y" Then
             ApplyPlan trial, pl, r, firstDataRow, lastRow, keys
@@ -253,6 +255,7 @@ Public Sub RefreshBudgetSheet1Preview(Optional ByVal silent As Boolean = False)
     panel.Range("E12").Value2 = "Trial refreshed; " & numEdits & " edit row(s); Set QTY cells linked: " & appliedSetCells
     If Not FindSheet(OVERVIEW_SHEET) Is Nothing Then FindSheet(OVERVIEW_SHEET).Range("B11").Value2 = "Set QTY cells linked: " & appliedSetCells
     Application.Calculate
+    If silent Then panel.Activate
     If Not silent Then
         panel.Activate
         MsgBox "Preview complete. Budget_Overview and Budget_Detail share the same trial; source unchanged.", vbInformation
@@ -1373,6 +1376,7 @@ Public Sub BudgetV4_OnDetailChange(ByVal target As Range)
             If seen.Count > 0 Then
                 p.Range("R4").Value2 = "Recalculating..."
                 RefreshBudgetSheet1Preview True
+                p.Activate
                 Update26FForSelectedH40V4
                 p.Range("R4").Value2 = "Updated automatically"
             End If
