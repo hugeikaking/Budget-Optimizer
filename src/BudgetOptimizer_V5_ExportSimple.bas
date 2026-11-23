@@ -127,6 +127,24 @@ Public Sub ExportBudgetV5SimpleCopy()
         Next mm
     Next k
 
+    ' Sales Amt DW:EP is a calculated output, not a manually adjusted input.
+    ' Freeze the current Trial amounts as static values without yellow marks.
+    stage = "Copying calculated Sales Amt values from trial"
+    For mm = 0 To S_MONTHS - 1
+        colInput = 127 + mm
+        trialValues = trial.Range(trial.Cells(firstRow, colInput), _
+            trial.Cells(lastRow, colInput)).Value2
+        For rowRelative = 1 To lastRow - firstRow + 1
+            rr = firstRow + rowRelative - 1
+            If SimpleValidRow(src, rr) Then
+                newValue = trialValues(rowRelative, 1)
+                If IsError(newValue) Then Err.Raise vbObjectError + 709, , _
+                    "Trial Sales Amt error at " & trial.Cells(rr, colInput).Address(False, False)
+                dst.Cells(rr, colInput).Value2 = newValue
+            End If
+        Next rowRelative
+    Next mm
+
     ' Never carry a dynamic C formula into the exported worksheet. Rows that
     ' have no effective input differences retain the original source A value.
     stage = "Validating review copy"
