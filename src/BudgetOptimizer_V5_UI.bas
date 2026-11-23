@@ -164,6 +164,7 @@ Public Sub SetupBudgetOptimizerV5UI()
         .Columns("P").ColumnWidth = 4
         .Columns("Q").ColumnWidth = 30
         .Columns("R").ColumnWidth = 23
+        .Activate
         .Range("A23").Select
     End With
 
