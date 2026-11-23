@@ -188,7 +188,10 @@ Public Sub ExportBudgetV5YellowCopy()
     logSheet.Range("A3:J3").AutoFilter
     exported.Activate
     exported.Range("A1").Select
-    outputBook.Calculate
+    ' Workbook has no Calculate method in Excel VBA; Worksheet does.
+    currentStage = "Recalculating exported Sheet1"
+    exported.Calculate
+    logSheet.Calculate
 
     currentStage = "Saving standalone .xlsx output"
     outputBook.SaveAs Filename:=CStr(outputPath), FileFormat:=xlOpenXMLWorkbook, CreateBackup:=False
