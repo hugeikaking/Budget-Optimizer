@@ -37,6 +37,9 @@ Public Sub ExportBudgetV5YellowCopy()
     Dim destinationCell As Range
     Dim currentStage As String
 
+    prevEvents = Application.EnableEvents
+    prevScreen = Application.ScreenUpdating
+    prevAlerts = Application.DisplayAlerts
     On Error GoTo Failed
     Set src = ExportSourceSheet()
     Set trial = ExportFindSheet(EX_TRIAL)
@@ -70,9 +73,6 @@ Public Sub ExportBudgetV5YellowCopy()
     If Len(Dir$(CStr(outputPath))) > 0 Then _
         Err.Raise vbObjectError + 606, , "The selected file exists. Choose a NEW file name."
 
-    prevEvents = Application.EnableEvents
-    prevScreen = Application.ScreenUpdating
-    prevAlerts = Application.DisplayAlerts
     Application.EnableEvents = False
     Application.ScreenUpdating = False
     Application.DisplayAlerts = False
