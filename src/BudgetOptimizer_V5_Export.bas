@@ -83,12 +83,12 @@ Public Sub ExportBudgetV5YellowCopy()
     Set exported = outputBook.Worksheets(1)
     exported.Name = "Sheet1"
 
-    ' A copied source may contain external links from the original workbook.
-    ' Do not market such a workbook as a standalone output.
-    linkData = outputBook.LinkSources(Type:=xlExcelLinks)
-    If IsArray(linkData) Then _
-        Err.Raise vbObjectError + 607, , _
-        "Source formulas contain external Excel links. Export cancelled to avoid a non-standalone file."
+    ' Excel may create workbook links when a single worksheet is copied.
+    ' First inspect the actual formula references, not only LinkSources.
+    ' If copied names alone caused phantom links, remove only demonstrably
+    ' unused external names in the NEW workbook and validate again.
+    currentStage = "Auditing copied sheet formulas and names"
+    ExportAuditCopiedLinks src, outputBook, exported
 
     currentStage = "Creating change log"
     Set logSheet = outputBook.Worksheets.Add(After:=exported)
@@ -311,3 +311,93 @@ Private Function ExportFirstDataRow(ByVal src As Worksheet, _
     Next r
     Err.Raise vbObjectError + 612, , "Could not find a numeric H40 data row."
 End Function
+
+
+' Audit external links arising from worksheet-only copy.
+' Never break workbook links: BreakLink would turn real formulas into values.
+' An external defined name is removed only if it is not referenced in ANY
+' worksheet formula, validation formula, chart series or conditional format.
+' For other links, stop with actionable diagnostic rather than corrupt output.
+Private Sub ExportAuditCopiedLinks(ByVal src As Worksheet, _
+    ByVal outputBook As Workbook, ByVal copiedSheet As Worksheet)
+    Dim sourceLinks As Variant, destLinks As Variant
+    Dim nm As Name, ws As Worksheet, rangeName As Name
+    Dim externalFormulaCount As Long, exampleCell As String
+    Dim usedNames As Object, nameKey As String, srcFormula As String
+    Dim it As Range, formulaCells As Range, c As Range
+    Dim removed As Long, linkExample As String
+    Dim fullRef As String, plainRef As String, externalRef As Boolean
+    Dim namesToDelete As Collection, candidate As Variant
+    Dim suspicious As Boolean
+
+    sourceLinks = src.Parent.LinkSources(Type:=xlExcelLinks)
+    destLinks = outputBook.LinkSources(Type:=xlExcelLinks)
+    If Not IsArray(destLinks) Then Exit Sub
+
+    On Error Resume Next
+    linkExample = CStr(destLinks(LBound(destLinks)))
+    On Error GoTo 0
+
+    ' Any external references in output cell formulas block automatic cleanup.
+    On Error Resume Next
+    Set formulaCells = copiedSheet.UsedRange.SpecialCells(xlCellTypeFormulas)
+    On Error GoTo 0
+    If Not formulaCells Is Nothing Then
+        For Each c In formulaCells.Cells
+            srcFormula = CStr(c.Formula)
+            If InStr(1, srcFormula, "[", vbBinaryCompare) > 0 And _
+               InStr(1, srcFormula, "]", vbBinaryCompare) > 0 Then
+                externalFormulaCount = externalFormulaCount + 1
+                If Len(exampleCell) = 0 Then exampleCell = c.Address(False, False)
+            End If
+        Next c
+    End If
+    If externalFormulaCount > 0 Then _
+        Err.Raise vbObjectError + 607, , _
+        "Copied Sheet1 contains " & externalFormulaCount & _
+        " formulas with workbook-style references (example " & exampleCell & ")." & _
+        " Check formula dependencies before exporting."
+
+    If IsArray(sourceLinks) Then _
+        Err.Raise vbObjectError + 613, , _
+        "The source workbook itself lists external links (example: " & _
+        Left$(linkExample, 180) & "). Review the original workbook dependencies."
+
+    ' Copying a sheet can turn unused defined names into external links.
+    ' Since we cannot establish their usage inside charts, data validation
+    ' or conditional formatting reliably, do not silently delete them.
+    ' Instead display their presence and stop with the specific cause.
+    Dim nmSample As String, nmCount As Long, ref As String
+    For Each nm In outputBook.Names
+        ref = vbNullString
+        On Error Resume Next
+        ref = nm.RefersTo
+        On Error GoTo 0
+        If InStr(1, ref, "[", vbBinaryCompare) > 0 And _
+           InStr(1, ref, "]", vbBinaryCompare) > 0 Then
+            nmCount = nmCount + 1
+            If Len(nmSample) = 0 Then nmSample = nm.Name
+        End If
+    Next nm
+    For Each nm In copiedSheet.Names
+        ref = vbNullString
+        On Error Resume Next
+        ref = nm.RefersTo
+        On Error GoTo 0
+        If InStr(1, ref, "[", vbBinaryCompare) > 0 And _
+           InStr(1, ref, "]", vbBinaryCompare) > 0 Then
+            nmCount = nmCount + 1
+            If Len(nmSample) = 0 Then nmSample = nm.Name
+        End If
+    Next nm
+    If nmCount > 0 Then _
+        Err.Raise vbObjectError + 614, , _
+        "Copy introduced " & nmCount & " external defined-name references" & _
+        " (example: " & nmSample & "). Not removed automatically because" & _
+        " validation/chart dependencies could use them."
+
+    Err.Raise vbObjectError + 615, , _
+        "Copied sheet has external link(s) but no cell formula reference found." & _
+        " First linked workbook: " & Left$(linkExample, 180) & _
+        ". May be chart, object, connection or hidden name."
+End Sub
