@@ -375,12 +375,12 @@ Private Sub ExportAuditCopiedLinks(ByVal src As Worksheet, _
         End If
     Next nm
     For Each nm In copiedSheet.Names
-        ref = vbNullString
+        refersText = vbNullString
         On Error Resume Next
-        ref = nm.RefersTo
+        refersText = nm.RefersTo
         On Error GoTo 0
-        If InStr(1, ref, "[", vbBinaryCompare) > 0 And _
-           InStr(1, ref, "]", vbBinaryCompare) > 0 Then
+        If InStr(1, refersText, "[", vbBinaryCompare) > 0 And _
+           InStr(1, refersText, "]", vbBinaryCompare) > 0 Then
             nmCount = nmCount + 1
             If Len(nmSample) = 0 Then nmSample = nm.Name
         End If
