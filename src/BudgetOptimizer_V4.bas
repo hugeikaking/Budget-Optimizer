@@ -1041,8 +1041,40 @@ Private Sub LinkLiveDetail(ByVal panel As Worksheet, ByVal trial As Worksheet, B
     For k = 1 To 4
         col = CLng(helper(k - 1))
         rng = "'" & TRIAL_SHEET & "'!" & trial.Range(trial.Cells(firstR, col), trial.Cells(lastR, col)).Address(True, True)
-        panel.Cells(k + 5, 4).Formula = "=SUMIF(" & criteria & ",$B$3," & rng & ")"
+        ' Some five-character H40 codes are right-padded with a space in source S.
+        ' V4 detail rows use Trim$ to match, so live totals must use the
+        ' same normalized key rather than SUMIF's exact raw S-column match.
+        panel.Cells(k + 5, 4).Formula = "=SUMPRODUCT(--(TRIM(" & criteria & _
+            ")=TRIM($B$3))," & rng & ")"
     Next k
+End Sub
+
+' Re-install only the four D6:D9 H40 total formulas after a V4 code update.
+' Does not recreate Budget_Trial, change Edit_Plan or overwrite target inputs.
+Public Sub RepairBudgetV4H40SummaryFormulas()
+    Dim p As Worksheet, tr As Worksheet, src As Worksheet
+    Dim keys(0 To MONTH_COUNT - 1) As Long, header As Long
+    Dim firstR As Long, lastR As Long
+
+    On Error GoTo Failed
+    Set p = FindSheet(PANEL_SHEET)
+    Set tr = FindSheet(TRIAL_SHEET)
+    Set src = SourceSheet()
+    If p Is Nothing Or tr Is Nothing Or src Is Nothing Then _
+        Err.Raise vbObjectError + 241, , _
+        "Budget_Detail, Budget_Trial and source are required."
+    FindRollingMonths src, keys, header
+    firstR = FindFirstBudgetDataRow(src, header)
+    lastR = src.Cells(src.Rows.Count, H40_COL).End(xlUp).Row
+    If lastR < firstR Then Err.Raise vbObjectError + 242, , "No budget data rows."
+    If lastR > tr.Cells(tr.Rows.Count, H40_COL).End(xlUp).Row Then _
+        Err.Raise vbObjectError + 243, , "Trial row count is shorter than source."
+    LinkLiveDetail p, tr, firstR, lastR
+    p.Range("D6:D9").Calculate
+    MsgBox "H40 summary D6:D9 formulas repaired with trimmed matching.", vbInformation
+    Exit Sub
+Failed:
+    MsgBox "H40 summary repair failed (" & Err.Number & "): " & Err.Description, vbExclamation
 End Sub
 
 Private Sub LinkOverviewSummary(ByVal trial As Worksheet, ByVal firstR As Long, ByVal lastR As Long)
