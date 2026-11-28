@@ -736,7 +736,13 @@ Private Sub EnsureOverview(ByVal src As Worksheet)
     ov.Range("B8").Formula = "=IFERROR(B7/B5-1,"""")"
     ov.Range("B9").Formula = "=IFERROR(B7/B6-1,"""")"
     ov.Range("B8:B9").NumberFormat = "0.00%"
-    ov.Range("E5").Formula = "=IF(COUNT(Base26!D2:D10000)=0,"""",SUM(Base26!D2:D10000))"
+    ' Optional fixed 26F TTL Sales Amt overrides the Base26 aggregation.
+    ' Keep the original Base26 fallback when the new input sheet is absent or blank.
+    If Not FindSheet("Budget_26F_Input") Is Nothing Then
+        ov.Range("E5").Formula = "=IF(ISNUMBER('Budget_26F_Input'!$B$2),'Budget_26F_Input'!$B$2,IF(COUNT(Base26!D2:D10000)=0,"""",SUM(Base26!D2:D10000)))"
+    Else
+        ov.Range("E5").Formula = "=IF(COUNT(Base26!D2:D10000)=0,"""",SUM(Base26!D2:D10000))"
+    End If
     ov.Range("E7").Formula = "=IFERROR(E6/E5-1,"""")"
     ov.Range("E7").NumberFormat = "0.00%"
     mV3Stage = "O08 prepare monthly chart data"
